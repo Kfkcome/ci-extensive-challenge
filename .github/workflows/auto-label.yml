@@ -1,0 +1,53 @@
+name: Auto Label Issues
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+
+permissions:
+  issues: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply labels based on keywords
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const text = `${context.payload.issue.title}\n${context.payload.issue.body || ""}`.toLowerCase();
+            const labelsToAdd = [];
+
+            if (text.includes("error")) labelsToAdd.push("bug");
+            if (text.includes("add")) labelsToAdd.push("feature");
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            async function ensureLabel(name, color, description) {
+              try {
+                await github.rest.issues.getLabel({ owner, repo, name });
+              } catch (e) {
+                if (e.status === 404) {
+                  await github.rest.issues.createLabel({ owner, repo, name, color, description });
+                } else {
+                  throw e;
+                }
+              }
+            }
+
+            if (labelsToAdd.includes("bug")) {
+              await ensureLabel("bug", "d73a4a", "Something isn't working");
+            }
+            if (labelsToAdd.includes("feature")) {
+              await ensureLabel("feature", "a2eeef", "New feature or request");
+            }
+
+            if (labelsToAdd.length > 0) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: context.payload.issue.number,
+                labels: labelsToAdd,
+              });
+            }
